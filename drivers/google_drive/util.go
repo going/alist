@@ -34,6 +34,7 @@ type googleDriveServiceAccount struct {
 	TokenURI string `json:"token_uri"`
 	//AuthProviderX509CertURL string `json:"auth_provider_x509_cert_url"`
 	//ClientX509CertURL       string `json:"client_x509_cert_url"`
+	Subject string `json:"subject"`
 }
 
 func (d *GoogleDrive) refreshToken() error {
@@ -97,14 +98,22 @@ func (d *GoogleDrive) refreshToken() error {
 		privateKeyPem, _ := pem.Decode([]byte(jsonData.PrivateKey))
 		privateKey, _ := x509.ParsePKCS8PrivateKey(privateKeyPem.Bytes)
 
+		claims := jwt.MapClaims{
+			"iss":   jsonData.ClientEMail,
+			"scope": gdsaScope,
+			"aud":   jsonData.TokenURI,
+			"exp":   timeEnd,
+			"iat":   timeStart,
+		}
+
+		if jsonData.Subject != "" {
+			claims["sub"] = jsonData.Subject
+			claims["prn"] = jsonData.Subject
+		}
+
 		jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256,
-			jwt.MapClaims{
-				"iss":   jsonData.ClientEMail,
-				"scope": gdsaScope,
-				"aud":   jsonData.TokenURI,
-				"exp":   timeEnd,
-				"iat":   timeStart,
-			})
+			claims)
+
 		assertion, err := jwtToken.SignedString(privateKey)
 		if err != nil {
 			return err
